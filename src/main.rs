@@ -1,3 +1,9 @@
+mod config;
+
+use config::load_config;
+
 fn main() {
-    println!("Hello, world!");
+    let _config = load_config();
+
+    println!("Starting up...");
 }
