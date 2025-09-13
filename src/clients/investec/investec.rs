@@ -79,7 +79,6 @@ impl InvestecClient {
 
         let body = response.text().await?;
 
-        // Parse as API response wrapper
         let api_response: ApiResponse<Balance> = serde_json::from_str(&body)?;
         Ok(api_response.data)
     }
