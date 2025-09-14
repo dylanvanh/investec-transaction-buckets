@@ -9,8 +9,13 @@ pub struct OllamaClient {
 }
 
 impl OllamaClient {
-    pub fn new(model: String) -> Self {
-        let ollama = Ollama::default();
+    pub fn new(model: String, host: Option<String>, port: Option<u16>) -> Self {
+        let ollama = match (host, port) {
+            (Some(h), Some(p)) => Ollama::new(h, p),
+            (Some(h), None) => Ollama::new(h, 11434),
+            (None, Some(p)) => Ollama::new("http://localhost".to_string(), p),
+            (None, None) => Ollama::default(),
+        };
         Self { ollama, model }
     }
 

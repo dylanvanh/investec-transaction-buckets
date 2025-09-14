@@ -31,7 +31,11 @@ impl BucketClassifier {
         };
 
         let ollama_client = if let Some(model_name) = model {
-            Some(OllamaClient::new(model_name))
+            Some(OllamaClient::new(
+                model_name,
+                config.ollama.host.clone(),
+                config.ollama.port,
+            ))
         } else {
             None
         };
@@ -285,6 +289,8 @@ mod tests {
             },
             ollama: OllamaConfig {
                 model: Some("test".to_string()),
+                host: None,
+                port: None,
             },
             city: Some("cape town".to_string()),
             database: DatabaseConfig {

@@ -2,3 +2,4 @@
 
 # Cargo configuration (contains sensitive API keys)
 .cargo/config.toml
+.env

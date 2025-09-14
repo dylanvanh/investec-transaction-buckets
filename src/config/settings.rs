@@ -24,6 +24,8 @@ pub struct GeminiConfig {
 #[derive(Debug, Clone)]
 pub struct OllamaConfig {
     pub model: Option<String>,
+    pub host: Option<String>,
+    pub port: Option<u16>,
 }
 
 #[derive(Debug, Clone)]
@@ -59,6 +61,8 @@ impl Config {
             },
             ollama: OllamaConfig {
                 model: Self::get_optional_var("OLLAMA_MODEL"),
+                host: Self::get_optional_var("OLLAMA_HOST"),
+                port: Self::get_optional_var("OLLAMA_PORT").and_then(|s| s.parse::<u16>().ok()),
             },
             database: DatabaseConfig {
                 url: Self::get_optional_var("DATABASE_URL")

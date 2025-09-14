@@ -1,0 +1,21 @@
+# Build artifacts
+/target
+**/target
+/sqlx-tmp
+**/sqlx-tmp
+
+# Git & editor
+.git
+.gitignore
+**/.DS_Store
+**/.idea
+**/.vscode
+**/.cursor
+
+# Env
+.env
+**/.env.*
+
+# Others
+Dockerfile
+docker-compose.yml

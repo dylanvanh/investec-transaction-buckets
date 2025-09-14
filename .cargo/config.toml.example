@@ -1,0 +1,16 @@
+[env]
+INVESTEC_X_API_KEY = "your_investec_api_key_here"
+INVESTEC_CLIENT_ID = "your_client_id_here"
+INVESTEC_CLIENT_SECRET = "your_client_secret_here"
+
+# Optional - uncomment to use Gemini instead of Ollama
+GEMINI_API_KEY = "your_gemini_key_here"
+GEMINI_MODEL = "gemini-2.5-flash"
+
+# Optional - for enhanced search
+GOOGLE_SEARCH_API_KEY = "your_google_api_key_here"
+GOOGLE_SEARCH_ENGINE_ID = "your_search_engine_id_here"
+
+OLLAMA_MODEL = "tinyllama:latest"
+CITY = "cape town"
+DATABASE_URL = "sqlite:transactions.db"
