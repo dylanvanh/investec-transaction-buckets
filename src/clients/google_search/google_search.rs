@@ -57,15 +57,12 @@ impl GoogleSearchClient {
         let mut context = String::new();
 
         for (index, item) in items.into_iter().enumerate() {
-            // Format the title with numbering
             context.push_str(&format!("{}. {}\n", index + 1, item.title));
 
-            // Add snippet if available
             if let Some(snippet) = item.snippet {
                 context.push_str(&format!("   {}\n", snippet));
             }
 
-            // Always add the link
             context.push_str(&format!("   {}\n\n", item.link));
         }
 

@@ -16,8 +16,8 @@ pub struct TokenState {
 pub struct Authenticator {
     http: Client,
     pub api_key: String,
-    client_id: String,
-    client_secret: String,
+    investec_client_id: String,
+    investec_client_secret: String,
     token: Arc<Mutex<TokenState>>,
 }
 
@@ -28,9 +28,9 @@ impl Authenticator {
                 .timeout(std::time::Duration::from_secs(30))
                 .build()
                 .expect("Failed to build HTTP client"),
-            api_key: config.x_api_key.clone(),
-            client_id: config.client_id.clone(),
-            client_secret: config.client_secret.clone(),
+            api_key: config.investec.x_api_key.clone(),
+            investec_client_id: config.investec.client_id.clone(),
+            investec_client_secret: config.investec.client_secret.clone(),
             token: Arc::new(Mutex::new(TokenState {
                 access_token: String::new(),
                 expires_at: 0,
@@ -55,8 +55,8 @@ impl Authenticator {
             .header("x-api-key", &self.api_key)
             .form(&[
                 ("grant_type", "client_credentials"),
-                ("client_id", &self.client_id),
-                ("client_secret", &self.client_secret),
+                ("client_id", &self.investec_client_id),
+                ("client_secret", &self.investec_client_secret),
                 ("scope", "accounts"),
             ])
             .send()

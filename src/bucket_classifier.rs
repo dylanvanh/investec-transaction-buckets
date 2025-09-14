@@ -1,5 +1,4 @@
-use crate::clients::google::google::GoogleSearchClient;
-use crate::clients::ollama::OllamaClient;
+use crate::clients::{GeminiClient, GoogleSearchClient, OllamaClient};
 use crate::config::settings::Config;
 use anyhow::Result;
 
@@ -14,20 +13,38 @@ const BUCKET_OTHER: &str = "Other";
 
 #[derive(Debug)]
 pub struct BucketClassifier {
-    ollama_client: OllamaClient,
-    search_client: GoogleSearchClient,
-    buckets: Vec<String>,
+    pub gemini_client: Option<GeminiClient>,
+    pub ollama_client: Option<OllamaClient>,
+    search_client: Option<GoogleSearchClient>,
+    pub buckets: Vec<String>,
     city: Option<String>,
 }
 
 impl BucketClassifier {
-    pub fn new(model: String, config: &Config) -> Self {
-        let ollama_client = OllamaClient::new(model);
+    pub fn new(model: Option<String>, config: &Config) -> Self {
+        let gemini_client = if let (Some(api_key), Some(model_name)) =
+            (&config.gemini.api_key, &config.gemini.model)
+        {
+            Some(GeminiClient::new(api_key.clone(), model_name.clone()))
+        } else {
+            None
+        };
 
-        let search_client = GoogleSearchClient::new(
-            config.google_search_api_key.clone(),
-            config.google_search_engine_id.clone(),
-        );
+        let ollama_client = if let Some(model_name) = model {
+            Some(OllamaClient::new(model_name))
+        } else {
+            None
+        };
+
+        let search_client = if let (Some(api_key), Some(engine_id)) = (
+            &config.google_search.api_key,
+            &config.google_search.engine_id,
+        ) {
+            Some(GoogleSearchClient::new(api_key.clone(), engine_id.clone()))
+        } else {
+            None
+        };
+
         let buckets = vec![
             BUCKET_FOOD.to_string(),
             BUCKET_TRANSPORTATION.to_string(),
@@ -40,6 +57,7 @@ impl BucketClassifier {
         ];
 
         Self {
+            gemini_client,
             ollama_client,
             search_client,
             buckets,
@@ -47,7 +65,7 @@ impl BucketClassifier {
         }
     }
 
-    async fn generate_search_query(&self, description: &str) -> Result<String> {
+    pub async fn generate_search_query(&self, description: &str) -> Result<String> {
         let base_query = format!("what is {} business", description.to_lowercase());
 
         if let Some(city) = &self.city {
@@ -57,88 +75,23 @@ impl BucketClassifier {
         }
     }
 
-    async fn search(&self, query: &str) -> Result<String> {
-        self.search_client.search(query).await
+    pub async fn search(&self, query: &str) -> Result<String> {
+        let search_client = self
+            .search_client
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Google Search client not available"))?;
+        search_client.search(query).await
     }
 
-    pub async fn classify_with_search(&self, description: &str, amount: f64) -> Result<String> {
-        let search_query = self.generate_search_query(description).await?;
-        println!("  Search query: {}", search_query);
-
-        let search_results = self.search(&search_query).await?;
-        println!(
-            "Search results: {}",
-            search_results.lines().next().unwrap_or("No results")
-        );
-
-        println!("search results: {}", search_results);
-
-        let prompt = format!(
-            "Classify this transaction: '{}'\n\
-             Amount: {:.2}\n\n\
-             Search results: {}\n\n\
-             Buckets: {}\n\n\
-             Based on the description and search results, which bucket does this belong to?\n\
-             Return only the bucket name:",
-            description,
-            amount,
-            search_results.lines().next().unwrap_or("No search results"),
-            self.buckets.join(", ")
-        );
-
-        let messages = vec![ollama_rs::generation::chat::ChatMessage::user(prompt)];
-        let bucket_response = self.ollama_client.chat(messages).await?;
-
-        self.find_best_bucket_match(&bucket_response)
-    }
-
-    pub async fn classify_transaction_without_search(
-        &self,
-        description: &str,
-        amount: f64,
-    ) -> Result<String> {
-        let prompt = format!(
-            "You are a financial transaction classifier. Your task is to categorize transactions into the most appropriate bucket.\n\n\
-             Available buckets: {}\n\n\
-             Transaction details:\n\
-             - Description: {}\n\
-             - Amount: {:.2}\n\n\
-             Examples:\n\
-             - 'STARBUCKS COFFEE' → Food\n\
-             - 'WOOLWORTHS' → Food\n\
-             - 'UBER TRIP' → Transportation\n\
-             - 'NETFLIX SUBSCRIPTION' → Entertainment\n\
-             - 'AMAZON PURCHASE' → Entertainment\n\
-             - 'ELECTRICITY BILL' → Bills & Utilities\n\
-             - 'DOCTOR VISIT' → Healthcare\n\
-             - 'FLIGHT TICKET' → Transportation\n\
-             - 'SALARY DEPOSIT' → Income\n\
-             - 'BANK TRANSFER' → Transfers\n\n\
-             Based on the description and amount pattern, classify this transaction.\n\
-             Return ONLY the bucket name, nothing else.",
-            self.buckets.join(", "),
-            description,
-            amount
-        );
-
-        let messages = vec![ollama_rs::generation::chat::ChatMessage::user(prompt)];
-        let bucket_response = self.ollama_client.chat(messages).await?;
-
-        self.find_best_bucket_match(&bucket_response)
-    }
-
-    fn find_best_bucket_match(&self, response: &str) -> Result<String> {
+    pub fn find_best_bucket_match(&self, response: &str) -> Result<String> {
         let response_lower = response.to_lowercase();
 
-        // If the llm behaved as expected, then the response should contain the bucket name
         for bucket in &self.buckets {
             if response_lower.contains(&bucket.to_lowercase()) {
                 return Ok(bucket.clone());
             }
         }
 
-        // Try partial word matches - check if any word in the response matches
-        // any word in a bucket name
         let response_words: Vec<&str> = response_lower.split_whitespace().collect();
         for bucket in &self.buckets {
             let bucket_lower = bucket.to_lowercase();
@@ -154,21 +107,185 @@ impl BucketClassifier {
 
         Ok(BUCKET_OTHER.to_string())
     }
+
+    pub async fn classify_transaction_with_fallback(
+        &self,
+        transaction: &crate::clients::investec::models::Transaction,
+    ) -> Result<String> {
+        if self.gemini_client.is_some() {
+            if let Ok(result) = self.try_gemini_with_search(transaction).await {
+                return Ok(result);
+            }
+        }
+
+        if self.ollama_client.is_some() && self.search_client.is_some() {
+            println!("Trying Ollama with search");
+            if let Ok(result) = self.try_ollama_with_search(transaction).await {
+                return Ok(result);
+            }
+        }
+
+        if self.ollama_client.is_some() {
+            if let Ok(result) = self.try_ollama_only(transaction).await {
+                return Ok(result);
+            }
+        }
+
+        Ok(BUCKET_OTHER.to_string())
+    }
+
+    async fn try_gemini_with_search(
+        &self,
+        transaction: &crate::clients::investec::models::Transaction,
+    ) -> Result<String> {
+        let prompt = format!(
+            "Classify this transaction into one of these buckets: {}\n\n\
+            Transaction: {}\n\
+            Amount: {:.2}\n\n\
+            IMPORTANT: You MUST perform a web search to get current information about what this transaction represents.\n\
+            Use the search results to understand the business/merchant and make an informed classification.\n\
+            Return only the bucket name, nothing else:",
+            self.buckets.join(", "),
+            transaction.description,
+            transaction.amount
+        );
+
+        let gemini_client = self
+            .gemini_client
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Gemini client not available"))?;
+
+        // Gemini uses its built-in Google Search tool - no external API needed
+        let response = gemini_client.generate_text_with_search(&prompt).await?;
+
+        println!("Gemini with built-in search response: {}", response);
+
+        self.process_classification_response(&response, "Gemini with built-in search")
+    }
+
+    async fn try_ollama_with_search(
+        &self,
+        transaction: &crate::clients::investec::models::Transaction,
+    ) -> Result<String> {
+        let ollama_client = self
+            .ollama_client
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Ollama client not available"))?;
+
+        let search_query = self.generate_search_query(&transaction.description).await?;
+        let search_results = self.search(&search_query).await?;
+
+        let prompt = self.create_classification_prompt(transaction, Some(&search_results));
+
+        let messages = vec![ollama_rs::generation::chat::ChatMessage::user(prompt)];
+        let response = ollama_client.chat(messages).await?;
+
+        self.process_classification_response(&response, "Ollama + Search")
+    }
+
+    async fn try_ollama_only(
+        &self,
+        transaction: &crate::clients::investec::models::Transaction,
+    ) -> Result<String> {
+        let ollama_client = self
+            .ollama_client
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Ollama client not available"))?;
+
+        let prompt = format!(
+            "Classify this transaction: '{}'\n\
+             Amount: {:.2}\n\n\
+             Buckets: {}\n\n\
+             Based on the description, which bucket does this belong to?\n\
+             Return only the bucket name:",
+            transaction.description,
+            transaction.amount,
+            self.buckets.join(", ")
+        );
+
+        let messages = vec![ollama_rs::generation::chat::ChatMessage::user(prompt)];
+        let response = ollama_client.chat(messages).await?;
+
+        self.process_classification_response(&response, "Ollama only")
+    }
+
+    fn create_classification_prompt(
+        &self,
+        transaction: &crate::clients::investec::models::Transaction,
+        search_context: Option<&str>,
+    ) -> String {
+        let base_prompt = format!(
+            "Classify this transaction into one of these buckets: {}\n\n\
+            Transaction: {}\n\
+            Amount: {:.2}\n\n",
+            self.buckets.join(", "),
+            transaction.description,
+            transaction.amount
+        );
+
+        match search_context {
+            Some(context) => format!(
+                "{}Search results for context:\n{}\n\n\
+                Based on the transaction description and search results, which bucket does this belong to?\n\
+                Return only the bucket name, nothing else:",
+                base_prompt, context
+            ),
+            None => format!(
+                "{}IMPORTANT: You MUST perform a web search to get current information about what this transaction represents.\n\
+                Use the search results to understand the business/merchant and make an informed classification.\n\
+                Return only the bucket name, nothing else:",
+                base_prompt
+            ),
+        }
+    }
+
+    fn process_classification_response(
+        &self,
+        response: &str,
+        strategy_name: &str,
+    ) -> Result<String> {
+        match self.find_best_bucket_match(response) {
+            Ok(bucket) => {
+                if bucket != BUCKET_OTHER.to_string() {
+                    println!("      → Bucket: {} (via {})", bucket, strategy_name);
+                    Ok(bucket)
+                } else {
+                    Err(anyhow::anyhow!("Classification returned 'Other' bucket"))
+                }
+            }
+            Err(e) => {
+                println!("      → {} parsing failed: {}", strategy_name, e);
+                Err(anyhow::anyhow!("{} failed: {}", strategy_name, e))
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::settings::Config;
+    use crate::config::settings::{
+        Config, GeminiConfig, GoogleSearchConfig, InvestecConfig, OllamaConfig,
+    };
 
     fn create_test_config() -> Config {
         Config {
-            x_api_key: "test".to_string(),
-            client_id: "test".to_string(),
-            client_secret: "test".to_string(),
-            google_search_api_key: "test".to_string(),
-            google_search_engine_id: "test".to_string(),
-            ollama_model: "test".to_string(),
+            investec: InvestecConfig {
+                x_api_key: "test".to_string(),
+                client_id: "test".to_string(),
+                client_secret: "test".to_string(),
+            },
+            google_search: GoogleSearchConfig {
+                api_key: Some("test".to_string()),
+                engine_id: Some("test".to_string()),
+            },
+            gemini: GeminiConfig {
+                api_key: Some("test".to_string()),
+                model: Some("test".to_string()),
+            },
+            ollama: OllamaConfig {
+                model: Some("test".to_string()),
+            },
             city: Some("cape town".to_string()),
         }
     }
@@ -176,7 +293,7 @@ mod tests {
     #[test]
     fn test_find_best_bucket_match_exact() {
         let config = create_test_config();
-        let classifier = BucketClassifier::new("test".to_string(), &config);
+        let classifier = BucketClassifier::new(Some("test".to_string()), &config);
 
         // Test exact match
         assert_eq!(
@@ -188,7 +305,7 @@ mod tests {
     #[test]
     fn test_find_best_bucket_match_partial() {
         let config = create_test_config();
-        let classifier = BucketClassifier::new("test".to_string(), &config);
+        let classifier = BucketClassifier::new(Some("test".to_string()), &config);
 
         // Test partial match
         assert_eq!(
@@ -202,7 +319,7 @@ mod tests {
     #[test]
     fn test_find_best_bucket_match_default() {
         let config = create_test_config();
-        let classifier = BucketClassifier::new("test".to_string(), &config);
+        let classifier = BucketClassifier::new(Some("test".to_string()), &config);
 
         // Test default case
         assert_eq!(

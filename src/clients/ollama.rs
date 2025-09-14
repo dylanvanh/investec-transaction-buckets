@@ -22,17 +22,4 @@ impl OllamaClient {
         let response = self.ollama.send_chat_messages(request).await?;
         Ok(response.message.content.trim().to_string())
     }
-
-    pub async fn is_available(&self) -> bool {
-        match self.ollama.list_local_models().await {
-            Ok(_) => true,
-            Err(_) => false,
-        }
-    }
-}
-
-impl Default for OllamaClient {
-    fn default() -> Self {
-        Self::new("tinyllama:latest".to_string())
-    }
 }

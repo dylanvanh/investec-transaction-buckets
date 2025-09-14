@@ -4,7 +4,7 @@ use reqwest::Client;
 use url::Url;
 
 use super::auth::Authenticator;
-use super::models::{Account, AccountsResponse, ApiResponse, Balance, TransactionsResponse};
+use super::models::{Account, AccountsResponse, ApiResponse, TransactionsResponse};
 
 const API_KEY_HEADER: &str = "x-api-key";
 
@@ -51,36 +51,6 @@ impl InvestecClient {
 
         let api_response: ApiResponse<AccountsResponse> = serde_json::from_str(&body)?;
         Ok(api_response.data.accounts)
-    }
-
-    pub async fn get_balance(&self, account_id: &str) -> Result<Balance> {
-        let token = self.authenticator.get_valid_token().await?;
-        let url = self
-            .base
-            .join(&format!("za/pb/v1/accounts/{}/balance", account_id))?;
-
-        let response = self
-            .http
-            .get(url)
-            .header(API_KEY_HEADER, &self.authenticator.api_key)
-            .bearer_auth(token)
-            .send()
-            .await?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await?;
-            return Err(anyhow::anyhow!(
-                "Balance API request failed with status {}: {}",
-                status,
-                body
-            ));
-        }
-
-        let body = response.text().await?;
-
-        let api_response: ApiResponse<Balance> = serde_json::from_str(&body)?;
-        Ok(api_response.data)
     }
 
     pub async fn get_transactions(
