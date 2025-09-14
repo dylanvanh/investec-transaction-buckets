@@ -2,7 +2,59 @@
 
 Rust app that fetches your Investec transactions and categorizes them using AI.
 
-## Quick Start
+## Docker Setup (Recommended)
+
+1. **Clone the repository:**
+
+   ```bash
+   git clone https://github.com/dylanvanh/investec-transaction-buckets
+   cd investec-transaction-buckets
+   ```
+
+2. **Setup environment variables:**
+
+   ```bash
+   cp .env.example .env
+   # Edit .env with your actual API credentials
+   ```
+
+3. **Required variables in `.env`:**
+
+   ```bash
+   # Required - Investec API
+   INVESTEC_X_API_KEY=your_investec_api_key_here
+   INVESTEC_CLIENT_ID=your_client_id_here
+   INVESTEC_CLIENT_SECRET=your_client_secret_here
+
+   # AI Model (Ollama runs automatically in container)
+   OLLAMA_MODEL=tinyllama:latest
+
+   # Optional - for better classification accuracy
+   GOOGLE_SEARCH_API_KEY=your_google_api_key_here
+   GOOGLE_SEARCH_ENGINE_ID=your_search_engine_id_here
+   CITY=cape town
+   ```
+
+4. **Run with Docker Compose:**
+
+   ```bash
+   docker compose up -d
+   ```
+
+5. **View logs:**
+
+   ```bash
+   docker compose logs -f app
+   ```
+
+6. **Access database:**
+   The SQLite database persists in a Docker volume. To query it:
+   ```bash
+   # Copy database to local machine for inspection
+   docker cp investec-app:/app/data/transactions.db ./transactions.db
+   ```
+
+## Local Development Setup
 
 1. **Install dependencies:**
 
