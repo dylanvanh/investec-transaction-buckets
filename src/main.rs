@@ -39,7 +39,7 @@ async fn main() -> anyhow::Result<()> {
             for account in &accounts {
                 let today = Utc::now().date_naive();
                 let tomorrow = today + chrono::Duration::days(1);
-                let from_date = "2025-09-11".to_string();
+                let from_date = today.format("%Y-%m-%d").to_string();
                 let to_date: String = tomorrow.format("%Y-%m-%d").to_string();
 
                 println!(

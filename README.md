@@ -1,50 +1,78 @@
 # Investec Transaction Buckets
 
-A Rust application for interacting with the Investec Private Banking API to retrieve account information, balances, and transaction data.
+Rust app that fetches your Investec transactions and categorizes them using AI.
 
-## Prerequisites
+## Quick Start
 
-- Rust 1.75 or later
-- Investec Private Banking API credentials
+1. **Install dependencies:**
 
-## Setup
+   - Rust 1.85+
+   - **Either** [Ollama](https://ollama.ai/) **or** Gemini API key
 
-### 1. Clone the repository
+2. **Clone and build:**
 
-```bash
-git clone https://github.com/dylanvanh/investec-transaction-buckets
-cd investec-transaction-buckets
-```
+   ```bash
+   git clone https://github.com/dylanvanh/investec-transaction-buckets
+   cd investec-transaction-buckets
+   cargo build
+   ```
 
-### 2. Build the project
+3. **Setup credentials** in `.cargo/config.toml`:
 
-```bash
-cargo build
-```
+   ```toml
+   [env]
+   # Required
+   INVESTEC_X_API_KEY = "your-investec-api-key"
+   INVESTEC_CLIENT_ID = "your-client-id"
+   INVESTEC_CLIENT_SECRET = "your-client-secret"
 
-### 3. Configure API credentials
+   # Choose ONE AI service (required)
+   # Option 1: Local AI (Ollama)
+   OLLAMA_MODEL = "tinyllama:latest"
 
-Create a `.cargo/config.toml` file:
+   # Option 2: Cloud AI (Gemini - includes built-in search)
+   GEMINI_API_KEY = "your-gemini-api-key"
+   GEMINI_MODEL = "gemini-1.5-flash"
 
-```toml
-[env]
-X_API_KEY = "your-x-api-key"
-CLIENT_ID = "your-client-id"
-CLIENT_SECRET = "your-client-secret"
-```
+   # Optional: Improves Ollama accuracy (not needed for Gemini)
+   GOOGLE_SEARCH_API_KEY = "your-google-search-api-key"
+   GOOGLE_SEARCH_ENGINE_ID = "your-search-engine-id"
 
-### 4. Get API Credentials
+   # Optional
+   CITY = "cape town"
+   ```
 
-1. Visit your [Investec Online Banking](https://login.secure.investec.com) profile
-2. Navigate to API settings and create a new API key
-3. Note down your Client ID, Client Secret, and X-API-Key
+4. **Get API keys:**
 
-## Usage
+   - **Investec**: Login to online banking → API settings
+   - **Gemini API**: [Get a Gemini API key](https://ai.google.dev/gemini-api/docs) (if using Gemini)
+   - **Google Search API**: [Create Custom Search Engine](https://developers.google.com/custom-search/v1/overview) (optional, improves Ollama)
 
-```bash
-cargo run
-```
+5. **If using Ollama, start it:**
 
-## API Documentation
+   ```bash
+   ollama pull tinyllama:latest
+   ollama serve
+   ```
 
-For complete API documentation, see: [Investec Private Banking API Documentation](https://developer.investec.com/za/api-products/documentation/SA_PB_Account_Information)
+6. **Run:**
+   ```bash
+   cargo run
+   ```
+
+## How it works
+
+- Fetches recent transactions from Investec API
+- Uses AI (Ollama or Gemini) to classify transactions into buckets
+- Gemini uses built-in Google Search, Ollama can use external search for better accuracy
+- Outputs categorized transactions
+
+## Requirements
+
+- **Investec API credentials** (required)
+- **Either Ollama running OR Gemini API key** (choose one)
+- **Google Search API** (optional, improves Ollama accuracy)
+
+## Buckets
+
+Transactions are categorized into: Food, Transportation, Entertainment, Bills & Utilities, Healthcare, Income, Transfers, Other.
