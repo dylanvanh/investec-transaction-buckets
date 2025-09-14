@@ -27,11 +27,17 @@ pub struct OllamaConfig {
 }
 
 #[derive(Debug, Clone)]
+pub struct DatabaseConfig {
+    pub url: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct Config {
     pub investec: InvestecConfig,
     pub google_search: GoogleSearchConfig,
     pub gemini: GeminiConfig,
     pub ollama: OllamaConfig,
+    pub database: DatabaseConfig,
     pub city: Option<String>,
 }
 
@@ -53,6 +59,10 @@ impl Config {
             },
             ollama: OllamaConfig {
                 model: Self::get_optional_var("OLLAMA_MODEL"),
+            },
+            database: DatabaseConfig {
+                url: Self::get_optional_var("DATABASE_URL")
+                    .unwrap_or_else(|| "sqlite://transactions.db".to_string()),
             },
             city: Self::get_optional_var("CITY"),
         })

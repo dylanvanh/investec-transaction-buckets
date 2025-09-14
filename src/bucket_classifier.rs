@@ -265,7 +265,7 @@ impl BucketClassifier {
 mod tests {
     use super::*;
     use crate::config::settings::{
-        Config, GeminiConfig, GoogleSearchConfig, InvestecConfig, OllamaConfig,
+        Config, DatabaseConfig, GeminiConfig, GoogleSearchConfig, InvestecConfig, OllamaConfig,
     };
 
     fn create_test_config() -> Config {
@@ -287,6 +287,9 @@ mod tests {
                 model: Some("test".to_string()),
             },
             city: Some("cape town".to_string()),
+            database: DatabaseConfig {
+                url: "sqlite://test.db".to_string(),
+            },
         }
     }
 

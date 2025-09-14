@@ -1,6 +1,7 @@
 mod bucket_classifier;
 mod clients;
 mod config;
+mod db;
 
 use config::settings::load_config;
 
@@ -32,6 +33,8 @@ async fn main() -> anyhow::Result<()> {
         println!("google search details present");
     }
 
+    let database = db::Database::initialize(&config.database.url).await?;
+
     match investec_client.get_accounts().await {
         Ok(accounts) => {
             println!("Found {} accounts:", accounts.len());
@@ -39,7 +42,7 @@ async fn main() -> anyhow::Result<()> {
             for account in &accounts {
                 let today = Utc::now().date_naive();
                 let tomorrow = today + chrono::Duration::days(1);
-                let from_date = today.format("%Y-%m-%d").to_string();
+                let from_date = today.format("2025-09-11").to_string();
                 let to_date: String = tomorrow.format("%Y-%m-%d").to_string();
 
                 println!(
@@ -59,6 +62,7 @@ async fn main() -> anyhow::Result<()> {
                         process_transactions(
                             &transactions_response.transactions,
                             &bucket_classifier,
+                            &database,
                         )
                         .await;
                     }
@@ -71,21 +75,44 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
-async fn process_transactions(transactions: &[models::Transaction], classifier: &BucketClassifier) {
+async fn process_transactions(
+    transactions: &[models::Transaction],
+    classifier: &BucketClassifier,
+    database: &db::Database,
+) {
     for transaction in transactions.iter() {
         println!(
             "    - {}: {} ({})",
             transaction.description, transaction.amount, transaction.type_
         );
 
-        match classifier
+        if let Some(uuid) = &transaction.uuid {
+            if let Ok(Some(existing_id)) =
+                db::find_transaction_id_by_uuid(&database.pool, uuid).await
+            {
+                println!("      → Already saved (id={}), skipping", existing_id);
+                continue;
+            }
+        }
+
+        let bucket = match classifier
             .classify_transaction_with_fallback(transaction)
             .await
         {
             Ok(bucket) => {
                 println!("      → Bucket: {}", bucket);
+                bucket
             }
-            Err(_) => unreachable!("Classification should never fail"),
+            Err(_) => {
+                println!("      → Classification failed, skipping persist");
+                continue;
+            }
+        };
+
+        if let Err(e) =
+            db::insert_tx_and_annotation(&database.pool, transaction, &bucket, None).await
+        {
+            println!("      → Failed to persist transaction + annotation: {}", e);
         }
     }
 }
