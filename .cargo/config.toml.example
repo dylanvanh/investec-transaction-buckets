@@ -14,3 +14,5 @@ GOOGLE_SEARCH_ENGINE_ID = "your_search_engine_id_here"
 OLLAMA_MODEL = "tinyllama:latest"
 CITY = "cape town"
 DATABASE_URL = "sqlite:transactions.db"
+
+BUCKETS = "Food,Transportation,Entertainment,Bills & Utilities,Healthcare,Income,Transfers,Other"

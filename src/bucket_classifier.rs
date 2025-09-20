@@ -2,13 +2,6 @@ use crate::clients::{GeminiClient, GoogleSearchClient, OllamaClient};
 use crate::config::settings::Config;
 use anyhow::Result;
 
-const BUCKET_FOOD: &str = "Food";
-const BUCKET_TRANSPORTATION: &str = "Transportation";
-const BUCKET_ENTERTAINMENT: &str = "Entertainment";
-const BUCKET_BILLS_UTILITIES: &str = "Bills & Utilities";
-const BUCKET_HEALTHCARE: &str = "Healthcare";
-const BUCKET_INCOME: &str = "Income";
-const BUCKET_TRANSFERS: &str = "Transfers";
 const BUCKET_OTHER: &str = "Other";
 
 #[derive(Debug)]
@@ -49,16 +42,7 @@ impl BucketClassifier {
             None
         };
 
-        let buckets = vec![
-            BUCKET_FOOD.to_string(),
-            BUCKET_TRANSPORTATION.to_string(),
-            BUCKET_ENTERTAINMENT.to_string(),
-            BUCKET_BILLS_UTILITIES.to_string(),
-            BUCKET_HEALTHCARE.to_string(),
-            BUCKET_INCOME.to_string(),
-            BUCKET_TRANSFERS.to_string(),
-            BUCKET_OTHER.to_string(),
-        ];
+        let buckets = config.buckets.categories.clone();
 
         Self {
             gemini_client,
@@ -269,7 +253,8 @@ impl BucketClassifier {
 mod tests {
     use super::*;
     use crate::config::settings::{
-        Config, DatabaseConfig, GeminiConfig, GoogleSearchConfig, InvestecConfig, OllamaConfig,
+        BucketsConfig, Config, DatabaseConfig, GeminiConfig, GoogleSearchConfig, InvestecConfig,
+        OllamaConfig,
     };
 
     fn create_test_config() -> Config {
@@ -296,6 +281,18 @@ mod tests {
             database: DatabaseConfig {
                 url: "sqlite://test.db".to_string(),
             },
+            buckets: BucketsConfig {
+                categories: vec![
+                    "Food".to_string(),
+                    "Transportation".to_string(),
+                    "Entertainment".to_string(),
+                    "Bills & Utilities".to_string(),
+                    "Healthcare".to_string(),
+                    "Income".to_string(),
+                    "Transfers".to_string(),
+                    "Other".to_string(),
+                ],
+            },
         }
     }
 
@@ -305,10 +302,7 @@ mod tests {
         let classifier = BucketClassifier::new(Some("test".to_string()), &config);
 
         // Test exact match
-        assert_eq!(
-            classifier.find_best_bucket_match(BUCKET_FOOD).unwrap(),
-            BUCKET_FOOD
-        );
+        assert_eq!(classifier.find_best_bucket_match("Food").unwrap(), "Food");
     }
 
     #[test]
@@ -321,7 +315,7 @@ mod tests {
             classifier
                 .find_best_bucket_match("This is a food transaction")
                 .unwrap(),
-            BUCKET_FOOD
+            "Food"
         );
     }
 
@@ -335,7 +329,7 @@ mod tests {
             classifier
                 .find_best_bucket_match("Unknown category")
                 .unwrap(),
-            BUCKET_OTHER
+            "Other"
         );
     }
 }

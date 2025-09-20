@@ -34,12 +34,18 @@ pub struct DatabaseConfig {
 }
 
 #[derive(Debug, Clone)]
+pub struct BucketsConfig {
+    pub categories: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Config {
     pub investec: InvestecConfig,
     pub google_search: GoogleSearchConfig,
     pub gemini: GeminiConfig,
     pub ollama: OllamaConfig,
     pub database: DatabaseConfig,
+    pub buckets: BucketsConfig,
     pub city: Option<String>,
 }
 
@@ -67,6 +73,13 @@ impl Config {
             database: DatabaseConfig {
                 url: Self::get_optional_var("DATABASE_URL")
                     .unwrap_or_else(|| "sqlite://transactions.db".to_string()),
+            },
+            buckets: BucketsConfig {
+                categories: Self::get_optional_var("BUCKETS")
+                    .unwrap_or_else(|| "Food,Transportation,Entertainment,Bills & Utilities,Healthcare,Income,Transfers,Other".to_string())
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .collect(),
             },
             city: Self::get_optional_var("CITY"),
         })
