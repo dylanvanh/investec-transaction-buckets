@@ -44,28 +44,17 @@ pub async fn run_sync(
 ) {
     match client.get_accounts().await {
         Ok(accounts) => {
-            println!("Found {} accounts:", accounts.len());
-
             for account in &accounts {
                 let today = Utc::now().date_naive();
                 let tomorrow = today + chrono::Duration::days(1);
                 let from_date = today.format("%Y-%m-%d").to_string();
                 let to_date: String = tomorrow.format("%Y-%m-%d").to_string();
 
-                println!(
-                    "\nGetting recent transactions for {} ({} to {})...",
-                    account.account_number, from_date, to_date
-                );
-
                 match client
                     .get_transactions(&account.account_id, &from_date, &to_date)
                     .await
                 {
                     Ok(transactions_response) => {
-                        println!(
-                            "  Found {} transactions",
-                            transactions_response.transactions.len()
-                        );
                         process_transactions(
                             &transactions_response.transactions,
                             classifier,
