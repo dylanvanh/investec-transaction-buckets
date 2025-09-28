@@ -26,6 +26,9 @@ Rust app that fetches your Investec transactions and categorizes them using AI.
    INVESTEC_CLIENT_ID=your_client_id_here
    INVESTEC_CLIENT_SECRET=your_client_secret_here
 
+   # Required - PostgreSQL Database
+   DATABASE_URL=postgresql://username:password@localhost:5432/investec_transactions
+
    # AI Model (Ollama runs automatically in container)
    OLLAMA_MODEL=tinyllama:latest
 
@@ -47,11 +50,29 @@ Rust app that fetches your Investec transactions and categorizes them using AI.
    docker compose logs -f app
    ```
 
-6. **Access database:**
-   The SQLite database persists in a Docker volume. To query it:
+6. **Migrations (sqlx-cli):**
+   Install the CLI and manage migrations locally or in CI.
+
    ```bash
-   # Copy database to local machine for inspection
-   docker cp investec-app:/app/data/transactions.db ./transactions.db
+   cargo install sqlx-cli --no-default-features --features rustls,postgres
+
+   # create a new reversible migration
+   sqlx migrate add -r add_new_table_or_index
+
+   # apply, revert, inspect
+   sqlx migrate run
+   sqlx migrate revert
+   sqlx migrate info
+   ```
+
+   The app also runs embedded migrations on startup via `sqlx::migrate!("./migrations")` to keep schema in sync in production.
+
+7. **Access database:**
+   PostgreSQL is available on port 5432. You can connect using:
+
+   ```bash
+   # Connect to PostgreSQL
+   psql -h localhost -p 5432 -U investec -d investec_transactions
    ```
 
 ## Local Development Setup
@@ -59,6 +80,7 @@ Rust app that fetches your Investec transactions and categorizes them using AI.
 1. **Install dependencies:**
 
    - Rust 1.85+
+   - PostgreSQL (local or Docker)
    - **Either** [Ollama](https://ollama.ai/) **or** Gemini API key
 
 2. **Clone and build:**
@@ -77,6 +99,7 @@ Rust app that fetches your Investec transactions and categorizes them using AI.
    INVESTEC_X_API_KEY = "your-investec-api-key"
    INVESTEC_CLIENT_ID = "your-client-id"
    INVESTEC_CLIENT_SECRET = "your-client-secret"
+   DATABASE_URL = "postgresql://username:password@localhost:5432/investec_transactions"
 
    # Choose ONE AI service (required)
    # Option 1: Local AI (Ollama)
@@ -108,6 +131,7 @@ Rust app that fetches your Investec transactions and categorizes them using AI.
    ```
 
 6. **Run:**
+
    ```bash
    cargo run
    ```

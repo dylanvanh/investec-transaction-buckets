@@ -1,31 +1,30 @@
 use anyhow::Result;
+use sqlx::migrate::Migrator;
 use sqlx::{
-    migrate::Migrator,
-    sqlite::{SqliteConnectOptions, SqlitePool},
+    Row,
+    postgres::{PgConnectOptions, PgPool},
 };
 use std::str::FromStr;
 
 static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
 
 pub struct Database {
-    pub pool: SqlitePool,
+    pub pool: PgPool,
 }
 
 impl Database {
     pub async fn initialize(database_url: &str) -> Result<Self> {
-        let options = SqliteConnectOptions::from_str(database_url)?.create_if_missing(true);
-
-        let pool = SqlitePool::connect_with(options).await?;
-
+        let options = PgConnectOptions::from_str(database_url)?;
+        let pool = PgPool::connect_with(options).await?;
         MIGRATOR.run(&pool).await?;
 
         Ok(Self { pool })
     }
 }
 
-pub async fn find_transaction_id_by_uuid(pool: &SqlitePool, uuid: &str) -> Result<Option<i64>> {
+pub async fn find_transaction_id_by_uuid(pool: &PgPool, uuid: &str) -> Result<Option<i64>> {
     let row: Option<(i64,)> =
-        sqlx::query_as(r#"SELECT id FROM investec_transactions WHERE uuid = ?1 LIMIT 1"#)
+        sqlx::query_as(r#"SELECT id FROM investec_transactions WHERE uuid = $1 LIMIT 1"#)
             .bind(uuid)
             .fetch_optional(pool)
             .await?;
@@ -34,7 +33,7 @@ pub async fn find_transaction_id_by_uuid(pool: &SqlitePool, uuid: &str) -> Resul
 }
 
 pub async fn insert_tx_and_annotation(
-    pool: &SqlitePool,
+    pool: &PgPool,
     tx: &crate::clients::investec::models::Transaction,
     bucket: &str,
     notes: Option<&str>,
@@ -47,7 +46,8 @@ pub async fn insert_tx_and_annotation(
             account_id, tx_type, transaction_type, status, description,
             card_number, posted_order, posting_date, value_date, action_date,
             transaction_date, amount, running_balance, uuid
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        RETURNING id
         "#,
     )
     .bind(&tx.account_id)
@@ -64,16 +64,16 @@ pub async fn insert_tx_and_annotation(
     .bind(tx.amount)
     .bind(&tx.running_balance)
     .bind(&tx.uuid)
-    .execute(&mut *txn)
+    .fetch_one(&mut *txn)
     .await?;
 
-    let inserted_id = insert_tx_result.last_insert_rowid();
+    let inserted_id: i64 = insert_tx_result.get(0);
 
     sqlx::query(
         r#"
         INSERT INTO transaction_annotations (
             investec_transaction_id, bucket, notes
-        ) VALUES (?1, ?2, ?3)
+        ) VALUES ($1, $2, $3)
         "#,
     )
     .bind(inserted_id)
@@ -83,6 +83,5 @@ pub async fn insert_tx_and_annotation(
     .await?;
 
     txn.commit().await?;
-
     Ok(inserted_id)
 }

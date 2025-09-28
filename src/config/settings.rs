@@ -71,8 +71,7 @@ impl Config {
                 port: Self::get_optional_var("OLLAMA_PORT").and_then(|s| s.parse::<u16>().ok()),
             },
             database: DatabaseConfig {
-                url: Self::get_optional_var("DATABASE_URL")
-                    .unwrap_or_else(|| "sqlite://transactions.db".to_string()),
+                url: Self::get_required_var("DATABASE_URL")?,
             },
             buckets: BucketsConfig {
                 categories: Self::get_optional_var("BUCKETS")

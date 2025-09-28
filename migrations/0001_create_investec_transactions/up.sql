@@ -1,5 +1,6 @@
-CREATE TABLE IF NOT EXISTS investec_transactions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+-- Up: Create investec_transactions (PostgreSQL)
+CREATE TABLE investec_transactions (
+    id SERIAL PRIMARY KEY,
     account_id TEXT NOT NULL,
     tx_type TEXT NOT NULL,
     transaction_type TEXT,
@@ -14,6 +15,5 @@ CREATE TABLE IF NOT EXISTS investec_transactions (
     amount REAL NOT NULL,
     running_balance REAL,
     uuid TEXT UNIQUE,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
-

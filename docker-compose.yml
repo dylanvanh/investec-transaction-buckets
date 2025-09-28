@@ -1,4 +1,22 @@
 services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: investec-postgres
+    environment:
+      POSTGRES_DB: investec_transactions
+      POSTGRES_USER: investec
+      POSTGRES_PASSWORD: investec_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U investec -d investec_transactions"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   ollama:
     image: ollama/ollama:latest
     container_name: investec-ollama
@@ -19,6 +37,8 @@ services:
       dockerfile: Dockerfile
     container_name: investec-app
     depends_on:
+      postgres:
+        condition: service_healthy
       ollama:
         condition: service_healthy
     env_file:
@@ -26,11 +46,9 @@ services:
     environment:
       - OLLAMA_HOST=http://ollama
       - OLLAMA_PORT=11434
-      - DATABASE_URL=sqlite:///app/data/transactions.db
-    volumes:
-      - app-data:/app/data
+      - DATABASE_URL=postgresql://investec:investec_password@postgres:5432/investec_transactions
     restart: unless-stopped
 
 volumes:
+  postgres-data:
   ollama:
-  app-data:
