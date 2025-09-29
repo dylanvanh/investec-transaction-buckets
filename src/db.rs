@@ -21,8 +21,8 @@ impl Database {
     }
 }
 
-pub async fn find_transaction_id_by_uuid(pool: &PgPool, uuid: &str) -> Result<Option<i64>> {
-    let row: Option<(i64,)> =
+pub async fn find_transaction_id_by_uuid(pool: &PgPool, uuid: &str) -> Result<Option<i32>> {
+    let row: Option<(i32,)> =
         sqlx::query_as(r#"SELECT id FROM investec_transactions WHERE uuid = $1 LIMIT 1"#)
             .bind(uuid)
             .fetch_optional(pool)
@@ -36,7 +36,7 @@ pub async fn insert_tx_and_annotation(
     tx: &crate::clients::investec::models::Transaction,
     bucket: &str,
     notes: Option<&str>,
-) -> Result<i64> {
+) -> Result<i32> {
     let mut txn = pool.begin().await?;
 
     let insert_tx_result = sqlx::query(
@@ -66,7 +66,7 @@ pub async fn insert_tx_and_annotation(
     .fetch_one(&mut *txn)
     .await?;
 
-    let inserted_id: i64 = insert_tx_result.get(0);
+    let inserted_id: i32 = insert_tx_result.get(0);
 
     sqlx::query(
         r#"
