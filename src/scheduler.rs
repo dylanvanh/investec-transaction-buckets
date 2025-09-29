@@ -23,11 +23,12 @@ pub async fn start_hourly(
             let classifier = Arc::clone(&classifier);
             let db_url = db_url.clone();
             Box::pin(async move {
+                tracing::debug!("Scheduler triggered");
                 match db::Database::initialize(&db_url).await {
                     Ok(database) => {
                         run_sync(client.as_ref(), classifier.as_ref(), &database).await;
                     }
-                    Err(e) => eprintln!("Failed to init DB for scheduled job: {}", e),
+                    Err(e) => tracing::error!("Failed to init DB for scheduled job: {}", e),
                 }
             })
         })?)
@@ -42,8 +43,18 @@ pub async fn run_sync(
     classifier: &BucketClassifier,
     database: &db::Database,
 ) {
+    tracing::info!("Starting transaction sync");
+
     match client.get_accounts().await {
         Ok(accounts) => {
+            if accounts.is_empty() {
+                tracing::warn!("No accounts found");
+                return;
+            }
+
+            let mut total_transactions = 0;
+            let mut new_transactions = 0;
+
             for account in &accounts {
                 let today = Utc::now().date_naive();
                 let tomorrow = today + chrono::Duration::days(1);
@@ -55,18 +66,34 @@ pub async fn run_sync(
                     .await
                 {
                     Ok(transactions_response) => {
-                        process_transactions(
-                            &transactions_response.transactions,
-                            classifier,
-                            database,
-                        )
-                        .await;
+                        let count = transactions_response.transactions.len();
+                        total_transactions += count;
+
+                        if count > 0 {
+                            let new_count = process_transactions(
+                                &transactions_response.transactions,
+                                classifier,
+                                database,
+                            )
+                            .await;
+                            new_transactions += new_count;
+                        }
                     }
-                    Err(e) => println!("  Failed to get transactions: {}", e),
+                    Err(e) => tracing::error!(
+                        account_id = %account.account_id,
+                        error = %e,
+                        "Failed to get transactions"
+                    ),
                 }
             }
+
+            tracing::info!(
+                total = total_transactions,
+                new = new_transactions,
+                "Sync complete"
+            );
         }
-        Err(e) => println!("Failed to get accounts: {}", e),
+        Err(e) => tracing::error!(error = %e, "Failed to get accounts"),
     }
 }
 
@@ -74,19 +101,19 @@ pub async fn process_transactions(
     transactions: &[models::Transaction],
     classifier: &BucketClassifier,
     database: &db::Database,
-) {
-    for transaction in transactions.iter() {
-        println!(
-            "    - {}: {} ({})",
-            transaction.description, transaction.amount, transaction.type_
-        );
+) -> usize {
+    let mut new_count = 0;
 
+    for transaction in transactions.iter() {
         if let Some(uuid) = &transaction.uuid {
-            if let Ok(Some(existing_id)) =
-                db::find_transaction_id_by_uuid(&database.pool, uuid).await
-            {
-                println!("      → Already saved (id={}), skipping", existing_id);
-                continue;
+            match db::find_transaction_id_by_uuid(&database.pool, uuid).await {
+                Ok(Some(_)) => {
+                    continue;
+                }
+                Ok(None) => {}
+                Err(_) => {
+                    continue;
+                }
             }
         }
 
@@ -94,20 +121,19 @@ pub async fn process_transactions(
             .classify_transaction_with_fallback(transaction)
             .await
         {
-            Ok(bucket) => {
-                println!("      → Bucket: {}", bucket);
-                bucket
-            }
+            Ok(bucket) => bucket,
             Err(_) => {
-                println!("      → Classification failed, skipping persist");
                 continue;
             }
         };
 
-        if let Err(e) =
-            db::insert_tx_and_annotation(&database.pool, transaction, &bucket, None).await
-        {
-            println!("      → Failed to persist transaction + annotation: {}", e);
+        match db::insert_tx_and_annotation(&database.pool, transaction, &bucket, None).await {
+            Ok(_) => {
+                new_count += 1;
+            }
+            Err(_) => {}
         }
     }
+
+    new_count
 }

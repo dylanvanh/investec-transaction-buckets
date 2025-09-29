@@ -13,6 +13,13 @@ use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
+
     let config = load_config();
 
     let investec_client = InvestecClient::new(config.clone())?;
@@ -24,13 +31,13 @@ async fn main() -> anyhow::Result<()> {
     let bucket_classifier = BucketClassifier::new(config.ollama.model.clone(), &config);
 
     if ollama_available {
-        println!("ollama details present");
+        tracing::info!("Ollama configuration available");
     }
     if gemini_available {
-        println!("gemini details present");
+        tracing::info!("Gemini configuration available");
     }
     if google_search_available {
-        println!("google search details present");
+        tracing::info!("Google Search configuration available");
     }
 
     let database = db::Database::initialize(&config.database.url).await?;
@@ -43,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
     let scheduler =
         scheduler::start_hourly(client_arc, classifier_arc, config.database.url.clone()).await?;
 
-    println!("Scheduler started. Sync runs every hour at :00");
+    tracing::info!("Scheduler started. Sync runs every hour at :00");
 
     tokio::signal::ctrl_c().await?;
 

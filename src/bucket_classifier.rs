@@ -107,7 +107,6 @@ impl BucketClassifier {
         }
 
         if self.ollama_client.is_some() && self.search_client.is_some() {
-            println!("Trying Ollama with search");
             if let Ok(result) = self.try_ollama_with_search(transaction).await {
                 return Ok(result);
             }
@@ -145,8 +144,6 @@ impl BucketClassifier {
 
         // Gemini uses its built-in Google Search tool - no external API needed
         let response = gemini_client.generate_text_with_search(&prompt).await?;
-
-        println!("Gemini with built-in search response: {}", response);
 
         self.process_classification_response(&response, "Gemini with built-in search")
     }
@@ -235,16 +232,12 @@ impl BucketClassifier {
         match self.find_best_bucket_match(response) {
             Ok(bucket) => {
                 if bucket != BUCKET_OTHER.to_string() {
-                    println!("      → Bucket: {} (via {})", bucket, strategy_name);
                     Ok(bucket)
                 } else {
                     Err(anyhow::anyhow!("Classification returned 'Other' bucket"))
                 }
             }
-            Err(e) => {
-                println!("      → {} parsing failed: {}", strategy_name, e);
-                Err(anyhow::anyhow!("{} failed: {}", strategy_name, e))
-            }
+            Err(e) => Err(anyhow::anyhow!("{} failed: {}", strategy_name, e)),
         }
     }
 }
