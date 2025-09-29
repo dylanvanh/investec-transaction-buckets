@@ -65,7 +65,7 @@ Rust app that fetches your Investec transactions and categorizes them using AI.
    sqlx migrate info
    ```
 
-   The app also runs embedded migrations on startup via `sqlx::migrate!("./migrations")` to keep schema in sync in production.
+   The app runs migrations from disk at startup using `Migrator::new(Path::new("./migrations"))`, so adding new SQL files does not require rebuilding the binary. In Docker, the `migrations/` folder is copied into the image.
 
 7. **Access database:**
    PostgreSQL is available on port 5432. You can connect using:

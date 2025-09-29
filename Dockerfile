@@ -36,8 +36,9 @@ RUN adduser -D -H appuser
 
 WORKDIR /app
 
-# Copy the compiled binary
+# Copy the compiled binary and migrations
 COPY --from=builder /app/target/release/investec-transaction-buckets /usr/local/bin/investec-transaction-buckets
+COPY --from=builder /app/migrations /app/migrations
 
 # App data directory (for SQLite)
 RUN mkdir -p /app/data \

@@ -6,8 +6,6 @@ use sqlx::{
 };
 use std::str::FromStr;
 
-static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
-
 pub struct Database {
     pub pool: PgPool,
 }
@@ -16,7 +14,8 @@ impl Database {
     pub async fn initialize(database_url: &str) -> Result<Self> {
         let options = PgConnectOptions::from_str(database_url)?;
         let pool = PgPool::connect_with(options).await?;
-        MIGRATOR.run(&pool).await?;
+        let migrator = Migrator::new(std::path::Path::new("./migrations")).await?;
+        migrator.run(&pool).await?;
 
         Ok(Self { pool })
     }
